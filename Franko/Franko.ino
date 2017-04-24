@@ -1,6 +1,9 @@
+#include <Arduino.h>
 #include <PID_v1.h>
 #include <LMotorController.h>
 #include "I2Cdev.h"
+#include "A4988.h"
+#include "DRV8825.h"
 
 #include "MPU6050_6Axis_MotionApps20.h"
 
@@ -9,7 +12,7 @@
 #endif
 
 
-#define LOG_INPUT 0
+#define LOG_INPUT 1
 #define MANUAL_TUNING 0
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
 #define MOVE_BACK_FORTH 0
@@ -58,19 +61,26 @@ int moveState=0; //0 = balance; 1 = back; 2 = forth
 //MOTOR CONTROLLER
 
 
-int ENA = 3;
-int IN1 = 4;
-int IN2 = 8;
-int IN3 = 5;
-int IN4 = 7;
-int ENB = 6;
+//int ENA = 3;
+//int IN1 = 4;
+//int IN2 = 8;
+//int IN3 = 5;
+//int IN4 = 7;
+//int ENB = 6;
+//
+//
+//LMotorController motorController(ENA, IN1, IN2, ENB, IN3, IN4, 0.6, 1);
 
-
-LMotorController motorController(ENA, IN1, IN2, ENB, IN3, IN4, 0.6, 1);
-
+#define MOTOR_STEPS 200
+#define DIR 8
+#define STEP 9
+#define ENBL 13
+#define MODE0 10
+#define MODE1 11
+#define MODE2 12
+DRV8825 motorController(MOTOR_STEPS, DIR, STEP, MODE0, MODE1, MODE2);
 
 //timers
-
 
 long time1Hz = 0;
 long time5Hz = 0;
@@ -85,6 +95,11 @@ void dmpDataReady()
 
 void setup()
 {
+    // motor setup
+    
+    motorController.setRPM(120);
+    motorController.setMicrostep(16);
+  
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
@@ -112,10 +127,15 @@ void setup()
     devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(220);
-    mpu.setYGyroOffset(76);
-    mpu.setZGyroOffset(-85);
-    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+//    mpu.setXGyroOffset(220);
+//    mpu.setYGyroOffset(76);
+//    mpu.setZGyroOffset(-85);
+//    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+
+    mpu.setXGyroOffset(94);
+    mpu.setYGyroOffset(-8);
+    mpu.setZGyroOffset(-1);
+    mpu.setZAccelOffset(3070);
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0)
@@ -166,7 +186,11 @@ void loop()
         //no mpu data - performing PID calculations and output to motors
         
         pid.Compute();
-        motorController.move(output, MIN_ABS_SPEED);
+        //Serial.print("pid output: ");
+        //Serial.println(output);
+        motorController.setRPM(120);
+        motorController.setMicrostep(32);
+        motorController.move(output/100);
         
         unsigned long currentMillis = millis();
 
