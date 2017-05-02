@@ -45,16 +45,16 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
   double kp , ki, kd;
   double prevKp, prevKi, prevKd;
 #endif
-double originalSetpoint = 174.29;
+double originalSetpoint = -0.50; //179.50; //174.29;
 double setpoint = originalSetpoint;
-double movingAngleOffset = 0.3;
+double movingAngleOffset = 0.0;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
 #if MANUAL_TUNING
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
 #else
-  PID pid(&input, &output, &setpoint, 70, 240, 1.9, DIRECT);
+  PID pid(&input, &output, &setpoint, 110, 400, .2, DIRECT); //i=240
 #endif
 
 
@@ -71,20 +71,27 @@ int moveState=0; //0 = balance; 1 = back; 2 = forth
 //
 //LMotorController motorController(ENA, IN1, IN2, ENB, IN3, IN4, 0.6, 1);
 
-#define MOTOR_STEPS 200
-#define DIR 8
-#define STEP 9
+#define MOTOR_STEPS 6400
 #define ENBL 13
-#define MODE0 10
-#define MODE1 11
-#define MODE2 12
-DRV8825 motorController(MOTOR_STEPS, DIR, STEP, MODE0, MODE1, MODE2);
+
+#define DIR_L 8
+#define STEP_L 9
+#define MODE0_L 10
+#define MODE1_L 11
+#define MODE2_L 12
+DRV8825 motorController_L(MOTOR_STEPS, DIR_L, STEP_L, MODE0_L, MODE1_L, MODE2_L);
+
+#define DIR_R 3
+#define STEP_R 4
+#define MODE0_R 5
+#define MODE1_R 6
+#define MODE2_R 7
+DRV8825 motorController_R(MOTOR_STEPS, DIR_R, STEP_R, MODE0_R, MODE1_R, MODE2_R);
 
 //timers
 
 long time1Hz = 0;
 long time5Hz = 0;
-
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 void dmpDataReady()
@@ -92,13 +99,12 @@ void dmpDataReady()
     mpuInterrupt = true;
 }
 
-
 void setup()
 {
     // motor setup
     
-    motorController.setRPM(120);
-    motorController.setMicrostep(16);
+    motorController_L.setMicrostep(32);
+    motorController_R.setMicrostep(32);
   
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -126,16 +132,13 @@ void setup()
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
 
-    // supply your own gyro offsets here, scaled for min sensitivity
-//    mpu.setXGyroOffset(220);
-//    mpu.setYGyroOffset(76);
-//    mpu.setZGyroOffset(-85);
-//    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
-
-    mpu.setXGyroOffset(94);
-    mpu.setYGyroOffset(-8);
-    mpu.setZGyroOffset(-1);
-    mpu.setZAccelOffset(3070);
+    mpu.setXAccelOffset(664);
+    mpu.setYAccelOffset(2323);
+    mpu.setZAccelOffset(1389);
+    mpu.setXGyroOffset(83);
+    mpu.setYGyroOffset(-7);
+    mpu.setZGyroOffset(-2);
+    
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0)
@@ -186,11 +189,21 @@ void loop()
         //no mpu data - performing PID calculations and output to motors
         
         pid.Compute();
-        //Serial.print("pid output: ");
-        //Serial.println(output);
-        motorController.setRPM(120);
-        motorController.setMicrostep(32);
-        motorController.move(output/100);
+        Serial.print("pid output: ");
+        Serial.println(output);
+        
+        int rotationSpeed = abs(map(output, -255, 255, -250, 250));
+
+        Serial.print("rotationSpeed: ");
+        Serial.println(rotationSpeed);
+
+        //motorController_L.setMicrostep(32);
+        motorController_L.setRPM(rotationSpeed);        
+        motorController_L.move(-output/10);
+
+        //motorController_R.setMicrostep(32);
+        motorController_R.setRPM(rotationSpeed);        
+        motorController_R.move(output/10);
         
         unsigned long currentMillis = millis();
 
@@ -239,14 +252,17 @@ void loop()
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         #if LOG_INPUT
-            Serial.print("ypr\t");
-            Serial.print(ypr[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(ypr[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(ypr[2] * 180/M_PI);
+            //Serial.print("ypr\t");
+            //Serial.print(ypr[0] * 180/M_PI);
+            //Serial.print("\t");
+            Serial.print("angle: ");
+            Serial.println(ypr[1] * 180/M_PI);
+            //Serial.print("\t");
+            //Serial.println(ypr[2] * 180/M_PI);
         #endif
-        input = ypr[1] * 180/M_PI + 180;
+        input = ypr[1] * 180/M_PI;
+        Serial.print("input: ");
+        Serial.println(input);
    }
 }
 
