@@ -15,7 +15,7 @@
 #define LOG_INPUT 1
 #define MANUAL_TUNING 0
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
-#define MOVE_BACK_FORTH 0
+#define MOVE_BACK_FORTH 1
 
 #define MIN_ABS_SPEED 30
 
@@ -45,31 +45,20 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
   double kp , ki, kd;
   double prevKp, prevKi, prevKd;
 #endif
-double originalSetpoint = -0.50; //179.50; //174.29;
+double originalSetpoint = -1.0; //179.50; //174.29;
 double setpoint = originalSetpoint;
-double movingAngleOffset = 0.0;
+double movingAngleOffset = 1.0;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
 #if MANUAL_TUNING
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
-#else
-  PID pid(&input, &output, &setpoint, 110, 400, .2, DIRECT); //i=240
+#else  
+  PID pid(&input, &output, &setpoint, 65, 400, .38, DIRECT); //i=240
 #endif
 
 
 //MOTOR CONTROLLER
-
-
-//int ENA = 3;
-//int IN1 = 4;
-//int IN2 = 8;
-//int IN3 = 5;
-//int IN4 = 7;
-//int ENB = 6;
-//
-//
-//LMotorController motorController(ENA, IN1, IN2, ENB, IN3, IN4, 0.6, 1);
 
 #define MOTOR_STEPS 6400
 #define ENBL 13
@@ -101,8 +90,7 @@ void dmpDataReady()
 
 void setup()
 {
-    // motor setup
-    
+    // motor setup    
     motorController_L.setMicrostep(32);
     motorController_R.setMicrostep(32);
   
@@ -160,7 +148,7 @@ void setup()
         packetSize = mpu.dmpGetFIFOPacketSize();
         
         //setup PID
-        
+                
         pid.SetMode(AUTOMATIC);
         pid.SetSampleTime(10);
         pid.SetOutputLimits(-255, 255);  
@@ -188,22 +176,21 @@ void loop()
     {
         //no mpu data - performing PID calculations and output to motors
         
-        pid.Compute();
-        Serial.print("pid output: ");
-        Serial.println(output);
+        pid.Compute();       
+        int rotationSpeed = abs(output);
+
+        #if LOG_INPUT
+          Serial.print("pid output: ");
+          Serial.println(output);
+          Serial.print("rotationSpeed: ");
+          Serial.println(rotationSpeed);
+        #endif        
         
-        int rotationSpeed = abs(map(output, -255, 255, -250, 250));
-
-        Serial.print("rotationSpeed: ");
-        Serial.println(rotationSpeed);
-
-        //motorController_L.setMicrostep(32);
         motorController_L.setRPM(rotationSpeed);        
-        motorController_L.move(-output/10);
-
-        //motorController_R.setMicrostep(32);
+        motorController_L.move(-output/8);
+        
         motorController_R.setRPM(rotationSpeed);        
-        motorController_R.move(output/10);
+        motorController_R.move(output/8);
         
         unsigned long currentMillis = millis();
 
@@ -266,14 +253,12 @@ void loop()
    }
 }
 
-
 void loopAt1Hz()
 {
 #if MANUAL_TUNING
     setPIDTuningValues();
 #endif
 }
-
 
 void loopAt5Hz()
 {
@@ -282,9 +267,7 @@ void loopAt5Hz()
     #endif
 }
 
-
 //move back and forth
-
 
 void moveBackForth()
 {
@@ -298,7 +281,6 @@ void moveBackForth()
     else
       setpoint = originalSetpoint + movingAngleOffset;
 }
-
 
 //PID Tuning (3 potentiometers)
 
@@ -317,7 +299,6 @@ void setPIDTuningValues()
         prevKp = kp; prevKi = ki; prevKd = kd;
     }
 }
-
 
 void readPIDTuningValues()
 {
