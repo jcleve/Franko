@@ -12,7 +12,7 @@
 #endif
 
 
-#define LOG_INPUT 1
+#define LOG_INPUT 0
 #define MANUAL_TUNING 0
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
 #define MOVE_BACK_FORTH 1
@@ -47,14 +47,15 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 #endif
 double originalSetpoint = -1.0; //179.50; //174.29;
 double setpoint = originalSetpoint;
-double movingAngleOffset = 1.0;
+double movingAngleOffset = 2.0;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
 #if MANUAL_TUNING
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
 #else  
-  PID pid(&input, &output, &setpoint, 65, 400, .38, DIRECT); //i=240
+  //PID pid(&input, &output, &setpoint, 60, 400, .35, DIRECT); // good tune with logging on.
+  PID pid(&input, &output, &setpoint, 10, 200, .10, DIRECT);
 #endif
 
 
@@ -187,10 +188,10 @@ void loop()
         #endif        
         
         motorController_L.setRPM(rotationSpeed);        
-        motorController_L.move(-output/8);
+        motorController_L.move(-output/12);
         
         motorController_R.setRPM(rotationSpeed);        
-        motorController_R.move(output/8);
+        motorController_R.move(output/12);
         
         unsigned long currentMillis = millis();
 
@@ -238,6 +239,7 @@ void loop()
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        input = ypr[1] * 180/M_PI;
         #if LOG_INPUT
             //Serial.print("ypr\t");
             //Serial.print(ypr[0] * 180/M_PI);
@@ -246,10 +248,9 @@ void loop()
             Serial.println(ypr[1] * 180/M_PI);
             //Serial.print("\t");
             //Serial.println(ypr[2] * 180/M_PI);
-        #endif
-        input = ypr[1] * 180/M_PI;
-        Serial.print("input: ");
-        Serial.println(input);
+            Serial.print("input: ");
+            Serial.println(input);
+        #endif       
    }
 }
 
