@@ -15,7 +15,7 @@
 #define LOG_INPUT 0
 #define MANUAL_TUNING 0
 #define LOG_PID_CONSTANTS 0 //MANUAL_TUNING must be 1
-#define MOVE_BACK_FORTH 1
+#define MOVE_BACK_FORTH 0
 
 #define MIN_ABS_SPEED 30
 
@@ -45,9 +45,9 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
   double kp , ki, kd;
   double prevKp, prevKi, prevKd;
 #endif
-double originalSetpoint = -1.0; //179.50; //174.29;
+double originalSetpoint = -0.8; //179.50; //174.29;
 double setpoint = originalSetpoint;
-double movingAngleOffset = 2.0;
+double movingAngleOffset = 1.0;
 double input, output;
 int moveState=0; //0 = balance; 1 = back; 2 = forth
 
@@ -55,13 +55,13 @@ int moveState=0; //0 = balance; 1 = back; 2 = forth
   PID pid(&input, &output, &setpoint, 0, 0, 0, DIRECT);
 #else  
   //PID pid(&input, &output, &setpoint, 60, 400, .35, DIRECT); // good tune with logging on.
-  PID pid(&input, &output, &setpoint, 10, 200, .10, DIRECT);
+  PID pid(&input, &output, &setpoint, 23, 400, 0.17, DIRECT);
 #endif
 
 
 //MOTOR CONTROLLER
 
-#define MOTOR_STEPS 6400
+#define MOTOR_STEPS 3200
 #define ENBL 13
 
 #define DIR_L 8
@@ -89,11 +89,13 @@ void dmpDataReady()
     mpuInterrupt = true;
 }
 
+int rotationSpeed;
+int outputSteps;
+
 void setup()
 {
     // motor setup    
-    motorController_L.setMicrostep(32);
-    motorController_R.setMicrostep(32);
+   
   
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -176,9 +178,16 @@ void loop()
     while (!mpuInterrupt && fifoCount < packetSize)
     {
         //no mpu data - performing PID calculations and output to motors
-        
-        pid.Compute();       
-        int rotationSpeed = abs(output);
+
+        //if(abs(input) > .5)
+        //{        
+          pid.Compute();       
+          rotationSpeed = abs(output);              
+        //}  
+        //else {
+          //rotationSpeed = 0;
+          //output = 0;
+        //}
 
         #if LOG_INPUT
           Serial.print("pid output: ");
@@ -186,12 +195,14 @@ void loop()
           Serial.print("rotationSpeed: ");
           Serial.println(rotationSpeed);
         #endif        
-        
+
+        motorController_L.setMicrostep(16);    
         motorController_L.setRPM(rotationSpeed);        
-        motorController_L.move(-output/12);
-        
+        motorController_L.move(-output/16);
+
+        motorController_R.setMicrostep(16);
         motorController_R.setRPM(rotationSpeed);        
-        motorController_R.move(output/12);
+        motorController_R.move(output/16);
         
         unsigned long currentMillis = millis();
 
